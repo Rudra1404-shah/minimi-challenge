@@ -9,6 +9,48 @@ export const MAX_TOKENS = 2048;
 export const SEARCH_MAX_RESULTS = 5;
 export const SEARCH_TIMEOUT_MS = 10_000;
 
+/**
+ * Known vendor names mapped to their official domains for vendor-domain search
+ * boosting and official/secondary source classification.
+ */
+export const VENDOR_DOMAINS: Record<string, string[]> = {
+  notion: ["notion.com", "notion.so"],
+  linear: ["linear.app"],
+  figma: ["figma.com"],
+  slack: ["slack.com"],
+  github: ["github.com"],
+  vercel: ["vercel.com"],
+  supabase: ["supabase.com"],
+  neon: ["neon.tech", "neon.com"],
+  render: ["render.com"],
+  railway: ["railway.app", "railway.com"],
+  "fly.io": ["fly.io"],
+  openai: ["openai.com"],
+  anthropic: ["anthropic.com", "claude.com"],
+  stripe: ["stripe.com"],
+  hubspot: ["hubspot.com"],
+  salesforce: ["salesforce.com"],
+  atlassian: ["atlassian.com"],
+  jira: ["atlassian.com"],
+  airtable: ["airtable.com"],
+  asana: ["asana.com"],
+  "monday.com": ["monday.com"],
+  clickup: ["clickup.com"],
+  cursor: ["cursor.com"],
+  cloudflare: ["cloudflare.com"],
+  netlify: ["netlify.com"],
+  heroku: ["heroku.com"],
+  intercom: ["intercom.com"],
+  zendesk: ["zendesk.com"],
+  pipedrive: ["pipedrive.com"],
+  datadog: ["datadoghq.com"],
+  sentry: ["sentry.io"],
+  posthog: ["posthog.com"],
+  planetscale: ["planetscale.com"],
+  turso: ["turso.tech"],
+  upstash: ["upstash.com"],
+};
+
 function parsePort(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const parsed = Number.parseInt(raw, 10);

@@ -129,9 +129,14 @@ function createAssistantTurnUI() {
         link.href = src.url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        const dateSuffix = src.date && src.date !== "unknown" ? ` (${src.date})` : "";
-        link.textContent = `${src.title || src.url}${dateSuffix}`;
-        link.title = `${src.title || src.url}${dateSuffix}`;
+        const kindPrefix =
+          src.kind && src.kind !== "unknown" ? `[${src.kind}] ` : "";
+        const dateSuffix =
+          src.date && src.date !== "unknown" ? ` (${src.date})` : "";
+        const searchedSuffix = src.label === "searched" ? " (searched)" : "";
+        const label = `${kindPrefix}${src.title || src.url}${dateSuffix}${searchedSuffix}`;
+        link.textContent = label;
+        link.title = `${label} — ${src.url}`;
         sourcesEl.appendChild(link);
       }
       if (sourcesEl.childElementCount > 0) {
@@ -285,18 +290,44 @@ async function sendMessage() {
       }
     });
 
+    const preservePartialReply = () => {
+      if (!assistantText.trim()) return false;
+      if (!assistantText.endsWith("(reply cut off)")) {
+        assistantText += "\n\n(reply cut off)";
+        turnUI.setText(assistantText);
+      }
+      if (!receivedDone) {
+        conversation.push({ role: "assistant", content: assistantText });
+      }
+      return true;
+    };
+
     if (!receivedDone && !receivedError) {
-      conversation.pop();
       turnUI.clearStatus();
-      turnUI.removeIfEmpty();
+      if (!preservePartialReply()) {
+        conversation.pop();
+        turnUI.removeIfEmpty();
+      }
       appendInlineError("Connection closed before the reply finished.");
-    } else if (receivedError) {
-      conversation.pop();
+    } else if (receivedError && !receivedDone) {
+      if (!preservePartialReply()) {
+        conversation.pop();
+      }
     }
   } catch (err) {
-    conversation.pop();
     turnUI.clearStatus();
-    turnUI.removeIfEmpty();
+    if (assistantText.trim()) {
+      if (!assistantText.endsWith("(reply cut off)")) {
+        assistantText += "\n\n(reply cut off)";
+        turnUI.setText(assistantText);
+      }
+      if (!receivedDone) {
+        conversation.push({ role: "assistant", content: assistantText });
+      }
+    } else {
+      conversation.pop();
+      turnUI.removeIfEmpty();
+    }
     const message =
       err instanceof Error ? err.message : "Network error while contacting server.";
     appendInlineError(message);

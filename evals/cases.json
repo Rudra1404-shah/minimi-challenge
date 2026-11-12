@@ -1,0 +1,16 @@
+[
+  {
+    "id": "notion-plus-pricing",
+    "question": "What is the current price and guest limit of Notion's Plus plan?",
+    "vendor": "notion",
+    "expectedDomains": ["notion.com", "notion.so"],
+    "expectReadOfficial": true,
+    "expectedFacts": [
+      "annual price per seat/member",
+      "monthly price per seat/member",
+      "guest limit (100 guests)"
+    ],
+    "notes": "Milestone 2 baseline case: should cite notion.com, mark the page READ, and state both annual and monthly prices plus the guest limit."
+  }
+]
+

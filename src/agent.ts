@@ -70,6 +70,58 @@ function addUniqueSources(target: SearchSource[], incoming: SearchSource[]): voi
   }
 }
 
+function normalizeUrlForMatching(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const pathname = parsed.pathname.replace(/\/+$/, "");
+    return `${host}${pathname}`;
+  } catch {
+    return raw.trim().toLowerCase().replace(/\/+$/, "");
+  }
+}
+
+/**
+ * Filters the collected sources to only those cited in the answer text.
+ * If no source URLs appear in the answer, falls back to the top 2 READ
+ * sources labeled as "searched".
+ */
+export function filterSourcesForAnswer(
+  sources: SearchSource[],
+  answerText: string
+): SearchSource[] {
+  const text = answerText.toLowerCase();
+
+  const cited = sources.filter((source) => {
+    if (!source.url) return false;
+    const directUrl = source.url.toLowerCase();
+    const noTrailingSlash = directUrl.replace(/\/+$/, "");
+    if (text.includes(directUrl) || text.includes(noTrailingSlash)) {
+      return true;
+    }
+
+    const normalized = normalizeUrlForMatching(source.url);
+    if (normalized && text.includes(normalized)) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (cited.length > 0) {
+    return cited;
+  }
+
+  const readSources = sources.filter((s) => s.readStatus === "READ");
+  const fallbackSources =
+    readSources.length > 0 ? readSources.slice(0, 2) : sources.slice(0, 2);
+
+  return fallbackSources.map((s) => ({
+    ...s,
+    label: "searched",
+  }));
+}
+
 export async function runAgent(params: {
   messages: ChatMessage[];
   callbacks: AgentCallbacks;
@@ -167,9 +219,10 @@ export async function runAgent(params: {
           return;
         }
 
+        const usedSources = filterSourcesForAnswer(collectedSources, fullText);
         callbacks.onDone({
           content: fullText,
-          sources: collectedSources,
+          sources: usedSources,
         });
         return;
       }
@@ -190,9 +243,10 @@ export async function runAgent(params: {
           `Please try asking a narrower question.`;
         fullText += capNotice;
         callbacks.onToken(capNotice);
+        const usedSources = filterSourcesForAnswer(collectedSources, fullText);
         callbacks.onDone({
           content: fullText,
-          sources: collectedSources,
+          sources: usedSources,
         });
         return;
       }
@@ -272,6 +326,21 @@ export async function runAgent(params: {
     if (signal?.aborted) {
       return;
     }
-    callbacks.onError(formatOpenAIError(err));
+
+    const formattedError = formatOpenAIError(err);
+
+    // If an error arrives after tokens have streamed, keep partial text and add (reply cut off).
+    if (fullText.trim().length > 0) {
+      const cutOffNotice = "\n\n(reply cut off)";
+      fullText += cutOffNotice;
+      callbacks.onToken(cutOffNotice);
+      const usedSources = filterSourcesForAnswer(collectedSources, fullText);
+      callbacks.onDone({
+        content: fullText,
+        sources: usedSources,
+      });
+    }
+
+    callbacks.onError(formattedError);
   }
 }
