@@ -4,17 +4,18 @@ import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { runAgent, type ChatMessage } from "./agent.js";
 import { PORT, logEnvWarnings } from "./config.js";
+import { getAllMessages } from "./history.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
-function validateMessages(body: unknown): ChatMessage[] | string {
+function validateMessages(body: unknown): { messages: ChatMessage[]; sessionId: string } | string {
   if (!body || typeof body !== "object") {
     return "Request body must be a JSON object.";
   }
 
-  const { messages } = body as { messages?: unknown };
+  const { messages, sessionId } = body as { messages?: unknown; sessionId?: unknown };
   if (!Array.isArray(messages) || messages.length === 0) {
     return "'messages' must be a non-empty array.";
   }
@@ -38,7 +39,10 @@ function validateMessages(body: unknown): ChatMessage[] | string {
     return "The last message must have role 'user'.";
   }
 
-  return cleaned;
+  const validSessionId =
+    typeof sessionId === "string" && sessionId.trim() ? sessionId.trim() : "default";
+
+  return { messages: cleaned, sessionId: validSessionId };
 }
 
 const app = Fastify({ logger: false });
@@ -50,6 +54,13 @@ await app.register(fastifyStatic, {
 
 app.get("/health", async () => {
   return { ok: true };
+});
+
+app.get("/api/history", async (request) => {
+  const query = request.query as { sessionId?: string };
+  const sessionId = query.sessionId?.trim() || "default";
+  const messages = getAllMessages(sessionId);
+  return { messages };
 });
 
 app.post("/api/chat", async (request, reply) => {
@@ -83,7 +94,8 @@ app.post("/api/chat", async (request, reply) => {
 
   try {
     await runAgent({
-      messages: validated,
+      messages: validated.messages,
+      sessionId: validated.sessionId,
       signal: abortController.signal,
       callbacks: {
         onToken: (text) => sendEvent("token", { text }),
@@ -115,4 +127,3 @@ async function start(): Promise<void> {
 }
 
 await start();
-

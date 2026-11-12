@@ -1,16 +1,114 @@
 [
   {
     "id": "notion-plus-pricing",
+    "category": "vendor-pricing",
     "question": "What is the current price and guest limit of Notion's Plus plan?",
     "vendor": "notion",
     "expectedDomains": ["notion.com", "notion.so"],
     "expectReadOfficial": true,
+    "expectSearch": true,
     "expectedFacts": [
-      "annual price per seat/member",
-      "monthly price per seat/member",
-      "guest limit (100 guests)"
+      "annual price ($10 per seat/month)",
+      "monthly price ($12 per seat/month)",
+      "guest limit (unlimited guests)"
     ],
-    "notes": "Milestone 2 baseline case: should cite notion.com, mark the page READ, and state both annual and monthly prices plus the guest limit."
+    "notes": "Official Notion pricing page shows $10/seat/mo billed annually ($12 monthly) and unlimited guest collaborators on Plus."
+  },
+  {
+    "id": "hubspot-crm-pricing",
+    "category": "vendor-pricing",
+    "question": "What is the current pricing of HubSpot's Sales Hub starter and professional plans?",
+    "vendor": "hubspot",
+    "expectedDomains": ["hubspot.com"],
+    "expectReadOfficial": true,
+    "expectSearch": true,
+    "expectedFacts": [
+      "starter plan pricing",
+      "professional plan pricing"
+    ],
+    "notes": "CRM pricing check benchmark: cites hubspot.com with pricing and billing basis."
+  },
+  {
+    "id": "neon-postgres-pricing",
+    "category": "vendor-pricing",
+    "question": "What are the current pricing tiers and compute options for Neon serverless Postgres?",
+    "vendor": "neon",
+    "expectedDomains": ["neon.tech", "neon.com"],
+    "expectReadOfficial": true,
+    "expectSearch": true,
+    "expectedFacts": [
+      "Free tier",
+      "Launch / Scale or per-compute hour pricing"
+    ],
+    "notes": "Postgres hosting pricing benchmark: cites neon.tech official pricing."
+  },
+  {
+    "id": "history-nov-3-check",
+    "category": "history-dates",
+    "question": "What did I ask on 3 November?",
+    "expectSearch": false,
+    "expectedFacts": [
+      "verified chat history reference",
+      "says no messages found if date has no history (never invents)"
+    ],
+    "notes": "Relative date resolution benchmark: resolved in code without calling tools, answers from history or says none found."
+  },
+  {
+    "id": "cloud-postgres-landscape",
+    "category": "market-landscape",
+    "question": "What are the common pricing models for cloud PostgreSQL hosting?",
+    "vendor": null,
+    "expectSearch": true,
+    "minDistinctDomains": 2,
+    "expectedFacts": [
+      "serverless vs provisioned pricing models",
+      "cites at least 2 distinct domains without vendor boost"
+    ],
+    "notes": "Non-vendor time-sensitive question: triggers web_search and cites multiple domains."
+  },
+  {
+    "id": "figma-pricing",
+    "category": "vendor-pricing",
+    "question": "What are the current pricing tiers and plan names of Figma?",
+    "vendor": "figma",
+    "expectedDomains": ["figma.com"],
+    "expectReadOfficial": true,
+    "expectSearch": true,
+    "expectedFacts": [
+      "Starter / Free",
+      "Professional",
+      "Organization / Enterprise"
+    ],
+    "notes": "Official Figma pricing check."
+  },
+  {
+    "id": "linear-pricing",
+    "category": "vendor-pricing",
+    "question": "What are Linear's current paid plan prices (annual and monthly)?",
+    "vendor": "linear",
+    "expectedDomains": ["linear.app"],
+    "expectReadOfficial": true,
+    "expectSearch": true,
+    "expectedFacts": [
+      "Basic plan ($10/mo annual, $12 monthly)",
+      "Business plan ($16/mo annual, $18 monthly)"
+    ],
+    "notes": "Official Linear pricing check."
+  },
+  {
+    "id": "simple-math",
+    "category": "no-search",
+    "question": "What is 17 * 23?",
+    "expectSearch": false,
+    "expectedFacts": ["391"],
+    "notes": "Timeless simple math: must answer directly without calling web_search."
+  },
+  {
+    "id": "conversational",
+    "category": "no-search",
+    "question": "Tell me about yourself.",
+    "expectSearch": false,
+    "expectedFacts": ["assistant introduction"],
+    "notes": "Conversational greeting: must answer directly without calling web_search."
   }
 ]
-

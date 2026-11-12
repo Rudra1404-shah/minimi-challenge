@@ -6,6 +6,7 @@ import {
   VENDOR_DOMAINS,
   getTavilyApiKey,
 } from "./config.js";
+import { getCachedSearch, setCachedSearch } from "./db.js";
 
 export type SourceKind = "official" | "secondary" | "unknown";
 export type ReadStatus = "READ" | "SNIPPET ONLY";
@@ -61,20 +62,65 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+const COMMON_DICTIONARY_VENDORS = new Set([
+  "linear",
+  "render",
+  "cursor",
+  "neon",
+  "stripe",
+  "fly.io",
+]);
+
+const VENDOR_CONTEXT_REGEX =
+  /\b(pricing|price|prices|cost|costs|plan|plans|tier|tiers|subscription|limit|limits|feature|features|guest|guests|pro|plus|enterprise|seat|seats|license|software|app|tool|platform|saas|api|docs|company|workspace|founder|ceo)\b/i;
+
 /**
  * Matches vendor names or domains from config.ts against the query.
+ * Restricts vendor-name matches to clear pricing/product queries or explicit domains,
+ * preventing generic words (linear, render, cursor, stripe) from triggering false boosts.
  */
 function detectVendorDomains(query: string): string[] {
   const domains = new Set<string>();
+  const trimmed = query.trim();
 
   for (const [vendor, vendorDomains] of Object.entries(VENDOR_DOMAINS)) {
-    const vendorPattern = new RegExp(`\\b${escapeRegex(vendor)}\\b`, "i");
-    const matchedDomain = vendorDomains.some((domain) =>
-      new RegExp(`\\b${escapeRegex(domain)}\\b`, "i").test(query)
+    // 1. Explicit domain in query
+    const domainMatch = vendorDomains.some((d) =>
+      new RegExp(`\\b${escapeRegex(d)}\\b`, "i").test(trimmed)
     );
-    if (vendorPattern.test(query) || matchedDomain) {
-      for (const domain of vendorDomains) {
-        domains.add(domain.toLowerCase());
+    if (domainMatch) {
+      for (const d of vendorDomains) domains.add(d.toLowerCase());
+      continue;
+    }
+
+    // 2. Possessive match (e.g. Notion's, Linear's, Figma's)
+    const possessivePattern = new RegExp(`\\b${escapeRegex(vendor)}['’]s?\\b`, "i");
+    const hasPossessive = possessivePattern.test(trimmed);
+
+    // 3. Exact vendor word
+    const vendorPattern = new RegExp(`\\b${escapeRegex(vendor)}\\b`, "i");
+    const hasVendorWord = vendorPattern.test(trimmed);
+
+    if (COMMON_DICTIONARY_VENDORS.has(vendor.toLowerCase())) {
+      const disambiguator =
+        vendor === "linear"
+          ? /\blinear\s*(?:app|issue|tracker|project|ticket|pricing|plan|software)\b/i
+          : vendor === "render"
+            ? /\brender\s*(?:cloud|hosting|service|pricing|deploy|platform)\b/i
+            : vendor === "cursor"
+              ? /\bcursor\s*(?:ai|editor|ide|pricing|tool)\b/i
+              : vendor === "neon"
+                ? /\bneon\s*(?:tech|db|database|postgres|serverless|pricing)\b/i
+                : vendor === "stripe"
+                  ? /\bstripe\s*(?:payment|billing|checkout|api|pricing|fee)\b/i
+                  : null;
+
+      if (hasPossessive || (disambiguator && disambiguator.test(trimmed))) {
+        for (const d of vendorDomains) domains.add(d.toLowerCase());
+      }
+    } else {
+      if (hasPossessive || (hasVendorWord && VENDOR_CONTEXT_REGEX.test(trimmed))) {
+        for (const d of vendorDomains) domains.add(d.toLowerCase());
       }
     }
   }
@@ -504,10 +550,9 @@ async function fetchAndReadPage(
 
     const extracted = extractMainTextAndDate(boundedHtml, finalUrl);
 
-    const publishedDate =
-      result.publishedDate !== "unknown"
-        ? result.publishedDate
-        : extracted.date ?? "unknown";
+    // Only a date the page itself explicitly states should be used.
+    // Never fallback to Tavily's synthetic date for fetched pages.
+    const publishedDate = extracted.date ?? "unknown";
 
     if (!extracted.text) {
       return {
@@ -643,6 +688,12 @@ export async function webSearch(
     };
   }
 
+  // Check search cache (1 hr TTL for pricing queries, 24 hr for general)
+  const cached = getCachedSearch(trimmedQuery);
+  if (cached) {
+    return cached;
+  }
+
   const apiKey = getTavilyApiKey();
   if (!apiKey) {
     return {
@@ -705,11 +756,19 @@ export async function webSearch(
         readStatus: r.readStatus,
       }));
 
-    return {
+    const output: WebSearchOutput = {
       text: formatResultsAsPlainText(enrichedResults, vendorDomains),
       sources,
       isError: false,
     };
+
+    const isPricing =
+      /\b(price|pricing|cost|costs|plan|plans|tier|tiers|fee|fees|rate|rates|subscription|license)\b/i.test(
+        trimmedQuery
+      );
+    setCachedSearch(trimmedQuery, output, isPricing);
+
+    return output;
   } catch (err) {
     return {
       text: formatSearchError(err),

@@ -228,6 +228,35 @@ async function readSseStream(response, onEvent) {
   }
 }
 
+let sessionId = localStorage.getItem("minimi_session_id");
+if (!sessionId) {
+  sessionId = "s_" + Math.random().toString(36).slice(2, 10);
+  localStorage.setItem("minimi_session_id", sessionId);
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`/api/history?sessionId=${encodeURIComponent(sessionId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data?.messages) || data.messages.length === 0) return;
+
+    for (const msg of data.messages) {
+      conversation.push({ role: msg.role, content: msg.content });
+      if (msg.role === "user") {
+        appendUserMessage(msg.content);
+      } else {
+        const turnUI = createAssistantTurnUI();
+        turnUI.setText(msg.content);
+      }
+    }
+  } catch {
+    // Ignore history load failure and start fresh
+  }
+}
+
+void loadHistory();
+
 async function sendMessage() {
   if (isStreaming) return;
   const text = inputEl.value.trim();
@@ -248,7 +277,7 @@ async function sendMessage() {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: conversation }),
+      body: JSON.stringify({ messages: conversation, sessionId }),
     });
 
     if (!response.ok) {
@@ -354,6 +383,8 @@ inputEl.addEventListener("input", resizeTextarea);
 clearBtn.addEventListener("click", () => {
   if (isStreaming) return;
   conversation.length = 0;
+  sessionId = "s_" + Math.random().toString(36).slice(2, 10);
+  localStorage.setItem("minimi_session_id", sessionId);
   messagesEl.innerHTML = "";
   if (emptyStateEl) {
     emptyStateEl.hidden = false;

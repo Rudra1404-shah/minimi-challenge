@@ -223,3 +223,13 @@ __marimo__/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# SQLite / Local database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Eval reports
+evals/report.json

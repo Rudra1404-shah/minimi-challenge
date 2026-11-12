@@ -11,6 +11,11 @@ import {
 } from "./config.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { webSearch, type SearchSource } from "./search.js";
+import {
+  resolveHistoryForQuery,
+  saveMessage,
+  trimMessagesToBudget,
+} from "./history.js";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -29,7 +34,7 @@ const WEB_SEARCH_TOOL: ChatCompletionTool = {
   function: {
     name: "web_search",
     description:
-      "Search the web for current or time-sensitive information such as prices, product releases, news, or people's current roles.",
+      "Search the web for current or time-sensitive information such as prices, pricing models, market rates, product releases, news, or people's current roles.",
     parameters: {
       type: "object",
       properties: {
@@ -70,64 +75,66 @@ function addUniqueSources(target: SearchSource[], incoming: SearchSource[]): voi
   }
 }
 
-function normalizeUrlForMatching(raw: string): string {
+function extractUrlsFromText(text: string): string[] {
+  const urls: string[] = [];
+  // Match markdown links: [text](https://...)
+  const mdRegex = /\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/gi;
+  let mdMatch: RegExpExecArray | null;
+  while ((mdMatch = mdRegex.exec(text)) !== null) {
+    urls.push(mdMatch[1]);
+  }
+
+  // Match raw URLs: https://...
+  const rawRegex = /(https?:\/\/[^\s<)\]'",]+)/gi;
+  let rawMatch: RegExpExecArray | null;
+  while ((rawMatch = rawRegex.exec(text)) !== null) {
+    urls.push(rawMatch[1]);
+  }
+
+  return urls;
+}
+
+function canonicalizeUrl(urlStr: string): string {
   try {
-    const parsed = new URL(raw);
-    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-    const pathname = parsed.pathname.replace(/\/+$/, "");
-    return `${host}${pathname}`;
+    const u = new URL(urlStr);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    return `${host}${path}`;
   } catch {
-    return raw.trim().toLowerCase().replace(/\/+$/, "");
+    return urlStr.trim().toLowerCase().replace(/\/+$/, "");
   }
 }
 
 /**
- * Filters the collected sources to only those cited in the answer text.
- * If no source URLs appear in the answer, falls back to the top 2 READ
- * sources labeled as "searched".
+ * Strictly filters collected sources so that only sources whose canonical URL
+ * appears in the answer text are returned. If no sources were cited, returns []
+ * (enforcing: no chips for unused results).
  */
 export function filterSourcesForAnswer(
   sources: SearchSource[],
   answerText: string
 ): SearchSource[] {
-  const text = answerText.toLowerCase();
-
-  const cited = sources.filter((source) => {
-    if (!source.url) return false;
-    const directUrl = source.url.toLowerCase();
-    const noTrailingSlash = directUrl.replace(/\/+$/, "");
-    if (text.includes(directUrl) || text.includes(noTrailingSlash)) {
-      return true;
-    }
-
-    const normalized = normalizeUrlForMatching(source.url);
-    if (normalized && text.includes(normalized)) {
-      return true;
-    }
-
-    return false;
-  });
-
-  if (cited.length > 0) {
-    return cited;
+  const citedUrls = extractUrlsFromText(answerText);
+  if (citedUrls.length === 0) {
+    return [];
   }
 
-  const readSources = sources.filter((s) => s.readStatus === "READ");
-  const fallbackSources =
-    readSources.length > 0 ? readSources.slice(0, 2) : sources.slice(0, 2);
+  const canonicalCited = new Set(citedUrls.map(canonicalizeUrl));
 
-  return fallbackSources.map((s) => ({
-    ...s,
-    label: "searched",
-  }));
+  return sources.filter((source) => {
+    if (!source.url) return false;
+    const sourceCanonical = canonicalizeUrl(source.url);
+    return canonicalCited.has(sourceCanonical);
+  });
 }
 
 export async function runAgent(params: {
   messages: ChatMessage[];
   callbacks: AgentCallbacks;
   signal?: AbortSignal;
+  sessionId?: string;
 }): Promise<void> {
-  const { messages, callbacks, signal } = params;
+  const { messages, callbacks, signal, sessionId = "default" } = params;
 
   const apiKey = getOpenAIApiKey();
   if (!apiKey) {
@@ -137,15 +144,41 @@ export async function runAgent(params: {
     return;
   }
 
+  // Persist the latest user message to SQLite history
+  const lastUserMsg = messages[messages.length - 1];
+  if (lastUserMsg && lastUserMsg.role === "user") {
+    saveMessage(sessionId, "user", lastUserMsg.content);
+  }
+
+  // Resolve relative/absolute date queries in code (e.g. "what did I ask on 3 November")
+  const dateResolution = lastUserMsg
+    ? resolveHistoryForQuery(sessionId, lastUserMsg.content)
+    : { isDateQuery: false, historyText: null };
+
   const client = new OpenAI({ apiKey });
   const systemPrompt = buildSystemPrompt();
+
+  // Trim older history turns beyond the token budget (Milestone 4)
+  const trimmedMessages = trimMessagesToBudget(messages);
+
   const conversation: ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...messages.map((m) => ({
+  ];
+
+  // If a date query matched past history (or lack thereof), inject it into context
+  if (dateResolution.historyText) {
+    conversation.push({
+      role: "system",
+      content: dateResolution.historyText,
+    });
+  }
+
+  for (const m of trimmedMessages) {
+    conversation.push({
       role: m.role,
       content: m.content,
-    })),
-  ];
+    });
+  }
 
   const collectedSources: SearchSource[] = [];
   let fullText = "";
@@ -219,6 +252,9 @@ export async function runAgent(params: {
           return;
         }
 
+        // Save assistant response to SQLite history
+        saveMessage(sessionId, "assistant", fullText);
+
         const usedSources = filterSourcesForAnswer(collectedSources, fullText);
         callbacks.onDone({
           content: fullText,
@@ -243,6 +279,8 @@ export async function runAgent(params: {
           `Please try asking a narrower question.`;
         fullText += capNotice;
         callbacks.onToken(capNotice);
+
+        saveMessage(sessionId, "assistant", fullText);
         const usedSources = filterSourcesForAnswer(collectedSources, fullText);
         callbacks.onDone({
           content: fullText,
@@ -334,6 +372,7 @@ export async function runAgent(params: {
       const cutOffNotice = "\n\n(reply cut off)";
       fullText += cutOffNotice;
       callbacks.onToken(cutOffNotice);
+      saveMessage(sessionId, "assistant", fullText);
       const usedSources = filterSourcesForAnswer(collectedSources, fullText);
       callbacks.onDone({
         content: fullText,
