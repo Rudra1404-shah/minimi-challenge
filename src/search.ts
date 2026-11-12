@@ -31,6 +31,7 @@ export interface WebSearchOutput {
   text: string;
   sources: SearchSource[];
   isError: boolean;
+  cacheHit: boolean;
 }
 
 interface EnrichedSearchResult extends SearchResult {
@@ -685,13 +686,14 @@ export async function webSearch(
       text: "Search failed: query must not be empty.",
       sources: [],
       isError: true,
+      cacheHit: false,
     };
   }
 
   // Check search cache (1 hr TTL for pricing queries, 24 hr for general)
   const cached = getCachedSearch(trimmedQuery);
   if (cached) {
-    return cached;
+    return { ...cached, cacheHit: true };
   }
 
   const apiKey = getTavilyApiKey();
@@ -700,6 +702,7 @@ export async function webSearch(
       text: "Search failed: TAVILY_API_KEY is not configured on the server.",
       sources: [],
       isError: true,
+      cacheHit: false,
     };
   }
 
@@ -760,6 +763,7 @@ export async function webSearch(
       text: formatResultsAsPlainText(enrichedResults, vendorDomains),
       sources,
       isError: false,
+      cacheHit: false,
     };
 
     const isPricing =
@@ -774,6 +778,7 @@ export async function webSearch(
       text: formatSearchError(err),
       sources: [],
       isError: true,
+      cacheHit: false,
     };
   }
 }

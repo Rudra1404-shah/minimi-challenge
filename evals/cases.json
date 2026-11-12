@@ -8,11 +8,11 @@
     "expectReadOfficial": true,
     "expectSearch": true,
     "expectedFacts": [
-      "annual price ($10 per seat/month)",
-      "monthly price ($12 per seat/month)",
-      "guest limit (unlimited guests)"
+      "unlimited guests",
+      ["$10", "annual"],
+      ["$12", "monthly"]
     ],
-    "notes": "Official Notion pricing page shows $10/seat/mo billed annually ($12 monthly) and unlimited guest collaborators on Plus."
+    "notes": "notion-plus-pricing: expectedFacts must include 'unlimited guests' and both annual and monthly prices ($10 and $12, per member per month). expectReadOfficial: true."
   },
   {
     "id": "hubspot-crm-pricing",
@@ -22,11 +22,12 @@
     "expectedDomains": ["hubspot.com"],
     "expectReadOfficial": true,
     "expectSearch": true,
+    "requireBillingBasis": true,
     "expectedFacts": [
-      "starter plan pricing",
-      "professional plan pricing"
+      ["$20", "annual"],
+      ["$7", "monthly"]
     ],
-    "notes": "CRM pricing check benchmark: cites hubspot.com with pricing and billing basis."
+    "notes": "hubspot-crm-pricing: requireBillingBasis: true. Add a fact that the Starter price is $20 per seat per month billed annually, and one that it is $7 per seat per month billed monthly. Mark these as expectations to check against the official HubSpot pricing page, not from memory. Set expectReadOfficial: true."
   },
   {
     "id": "neon-postgres-pricing",
@@ -37,10 +38,10 @@
     "expectReadOfficial": true,
     "expectSearch": true,
     "expectedFacts": [
-      "Free tier",
-      "Launch / Scale or per-compute hour pricing"
+      "Free",
+      "compute"
     ],
-    "notes": "Postgres hosting pricing benchmark: cites neon.tech official pricing."
+    "notes": "Postgres hosting pricing benchmark: cites neon.com / neon.tech official pricing."
   },
   {
     "id": "history-nov-3-check",
@@ -48,10 +49,9 @@
     "question": "What did I ask on 3 November?",
     "expectSearch": false,
     "expectedFacts": [
-      "verified chat history reference",
-      "says no messages found if date has no history (never invents)"
+      "How do I configure connection pooling for Postgres?"
     ],
-    "notes": "Relative date resolution benchmark: resolved in code without calling tools, answers from history or says none found."
+    "notes": "history-nov-3-check: expectSearch: false. In addition, the saved message text for 3 November must be seeded by the runner before the run, and the expected fact is that exact text. Do not accept an answer that quotes text not in the seed."
   },
   {
     "id": "cloud-postgres-landscape",
@@ -61,10 +61,9 @@
     "expectSearch": true,
     "minDistinctDomains": 2,
     "expectedFacts": [
-      "serverless vs provisioned pricing models",
-      "cites at least 2 distinct domains without vendor boost"
+      "serverless"
     ],
-    "notes": "Non-vendor time-sensitive question: triggers web_search and cites multiple domains."
+    "notes": "cloud-postgres-landscape: minDistinctDomains: 2. expectSearch: true."
   },
   {
     "id": "figma-pricing",
@@ -74,12 +73,14 @@
     "expectedDomains": ["figma.com"],
     "expectReadOfficial": true,
     "expectSearch": true,
+    "requireBillingBasis": true,
     "expectedFacts": [
-      "Starter / Free",
+      "Starter",
       "Professional",
-      "Organization / Enterprise"
+      "Organization",
+      "Enterprise"
     ],
-    "notes": "Official Figma pricing check."
+    "notes": "figma-pricing: requireBillingBasis: true. expectReadOfficial: true. Add expectedFacts for the four plan names: Starter, Professional, Organization, Enterprise."
   },
   {
     "id": "linear-pricing",
@@ -89,26 +90,28 @@
     "expectedDomains": ["linear.app"],
     "expectReadOfficial": true,
     "expectSearch": true,
+    "requireBillingBasis": true,
     "expectedFacts": [
-      "Basic plan ($10/mo annual, $12 monthly)",
-      "Business plan ($16/mo annual, $18 monthly)"
+      "$10",
+      "$16"
     ],
-    "notes": "Official Linear pricing check."
+    "notes": "linear-pricing: requireBillingBasis: true. expectedFacts: '$10' and '$16'. expectReadOfficial: true."
   },
   {
     "id": "simple-math",
     "category": "no-search",
     "question": "What is 17 * 23?",
     "expectSearch": false,
-    "expectedFacts": ["391"],
-    "notes": "Timeless simple math: must answer directly without calling web_search."
+    "expectedFacts": [
+      "391"
+    ],
+    "notes": "simple-math: expectSearch: false. expectedFacts: ['391']."
   },
   {
     "id": "conversational",
     "category": "no-search",
     "question": "Tell me about yourself.",
     "expectSearch": false,
-    "expectedFacts": ["assistant introduction"],
-    "notes": "Conversational greeting: must answer directly without calling web_search."
+    "notes": "conversational: expectSearch: false."
   }
 ]

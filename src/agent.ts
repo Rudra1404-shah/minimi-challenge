@@ -25,7 +25,7 @@ export interface ChatMessage {
 export interface AgentCallbacks {
   onToken: (text: string) => void;
   onStatus: (message: string) => void;
-  onDone: (result: { content: string; sources: SearchSource[] }) => void;
+  onDone: (result: { content: string; sources: SearchSource[]; cacheHit?: boolean }) => void;
   onError: (error: string) => void;
 }
 
@@ -182,6 +182,7 @@ export async function runAgent(params: {
 
   const collectedSources: SearchSource[] = [];
   let fullText = "";
+  let searchCacheHit = false;
 
   try {
     for (let step = 1; step <= MAX_AGENT_STEPS; step++) {
@@ -259,6 +260,7 @@ export async function runAgent(params: {
         callbacks.onDone({
           content: fullText,
           sources: usedSources,
+          cacheHit: searchCacheHit,
         });
         return;
       }
@@ -285,6 +287,7 @@ export async function runAgent(params: {
         callbacks.onDone({
           content: fullText,
           sources: usedSources,
+          cacheHit: searchCacheHit,
         });
         return;
       }
@@ -346,6 +349,9 @@ export async function runAgent(params: {
 
         callbacks.onStatus(`Searching: ${query}`);
         const searchOutput = await webSearch(query, signal);
+        if (searchOutput.cacheHit) {
+          searchCacheHit = true;
+        }
         addUniqueSources(collectedSources, searchOutput.sources);
 
         conversation.push({
@@ -377,6 +383,7 @@ export async function runAgent(params: {
       callbacks.onDone({
         content: fullText,
         sources: usedSources,
+        cacheHit: searchCacheHit,
       });
     }
 

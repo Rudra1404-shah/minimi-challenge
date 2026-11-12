@@ -8,6 +8,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
+    "test": "tsx evals/runner.test.ts && tsx src/dates.test.ts",
     "test:dates": "tsx src/dates.test.ts",
     "eval": "tsx evals/runner.ts"
   },
