@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minimi Chat</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-title">
+        <h1>Minimi Chat</h1>
+        <span class="subtitle">Fast answers with live web search</span>
+      </div>
+      <button id="clear-btn" class="clear-btn" type="button">New chat</button>
+    </header>
+
+    <main id="messages" class="messages" aria-live="polite">
+      <div class="empty-state" id="empty-state">
+        <p class="empty-title">Ask anything</p>
+        <p class="empty-hint">
+          Try current pricing, recent releases, quick math, or general questions.
+        </p>
+      </div>
+    </main>
+
+    <form id="chat-form" class="composer">
+      <textarea
+        id="input"
+        rows="1"
+        placeholder="Ask a question... (Enter to send, Shift+Enter for newline)"
+        aria-label="Message input"
+      ></textarea>
+      <button id="send-btn" type="submit">Send</button>
+    </form>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+
